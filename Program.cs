@@ -1,4 +1,8 @@
-﻿using System;
+﻿// TODO: (melss) Это не последняя версия, не соблюдено требование "Необходимо разработать консольное приложение (CLI) на **.NET 10**".
+// TODO: (melss) Проект не собирается и не запускается, ошибка "1>C:\Users\melss\vs_code\SalesAnalyzer\SalesAnalyzer.csproj(90,5): error : Данный проект ссылается на пакеты NuGet, отсутствующие на этом компьютере. Используйте восстановление пакетов NuGet, чтобы скачать их.  Дополнительную информацию см. по адресу: http://go.microsoft.com/fwlink/?LinkID=322105. Отсутствует следующий файл: ..\packages\System.ValueTuple.4.6.2\build\net471\System.ValueTuple.targets."
+// TODO: (melss) Зачем здесь зависимость "..\packages\System.ValueTuple.4.6.2\build\net471\System.ValueTuple.targets"?
+// TODO: (melss) Что это в файле проекта "<Compile Include="Properties\AssemblyInfo.cs" />"?
+using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
@@ -10,7 +14,7 @@ namespace SalesAnalyzer
     internal class Program
     {
         // Шаблон записи о продаже
-        public class SaleRecord
+        public class SaleRecord // TODO: (melss) Почему отклонились от задания в такой мелочи? "- Читать CSV, преобразовывать строки в объекты `Sale`."
         {
             public int OrderId { get; set; }
             public DateTime OrderDate { get; set; }
@@ -28,6 +32,8 @@ namespace SalesAnalyzer
 
         static void Main(string[] args)
         {
+            // TODO: (melss) Вообще не понял прикола с 1 или 2. Где ожидаемые аргументы из задания?
+            // TODO: (melss) Нету не одной try/catch. Обработки ошибок не предусмотрено.
             // Так как работа с аргументами командной строки не реализована,выбор режима выполняется через простое меню в консоли
             Console.WriteLine("=== Программа анализа продаж ===");
             Console.WriteLine("Выберите режим:");
@@ -140,8 +146,8 @@ namespace SalesAnalyzer
         static void PrintSales(List<SaleRecord> sales)
         {
             Console.WriteLine($"{"OrderId",-10} {"Date",-10} {"Category",-15} {"Qty",-5} {"Price",-10} {"Revenue",-12}");
-            Console.WriteLine(new string('-', 65));
-            for (int i = 0; i < sales.Count; i++)
+            Console.WriteLine(new string('-', 65)); // TODO: (melss) Что это за строка? Зачем и почему так написано?
+            for (int i = 0; i < sales.Count; i++)  // TODO: (melss) Объясните почему здесь написали for? Почему не foreach?
             {
                 var s = sales[i];
                 Console.WriteLine($"{s.OrderId,-10} {s.OrderDate:dd.MM.yyyy} {s.ProductCategory,-15} {s.Quantity,-5} {s.UnitPrice,-10:F2} {s.Revenue,-12:F2}");
