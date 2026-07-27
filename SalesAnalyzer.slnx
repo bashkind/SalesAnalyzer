@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="NewByTemplate/NewByTemplate.csproj" />
+  <Project Path="SalesAnalyzer.csproj" Id="4c3994f6-3ba6-46ae-8f4b-43cc85cebaff" />
+</Solution>
