@@ -1,7 +1,3 @@
-﻿// TODO: (melss) Это не последняя версия, не соблюдено требование "Необходимо разработать консольное приложение (CLI) на **.NET 10**".
-// TODO: (melss) Проект не собирается и не запускается, ошибка "1>C:\Users\melss\vs_code\SalesAnalyzer\SalesAnalyzer.csproj(90,5): error : Данный проект ссылается на пакеты NuGet, отсутствующие на этом компьютере. Используйте восстановление пакетов NuGet, чтобы скачать их.  Дополнительную информацию см. по адресу: http://go.microsoft.com/fwlink/?LinkID=322105. Отсутствует следующий файл: ..\packages\System.ValueTuple.4.6.2\build\net471\System.ValueTuple.targets."
-// TODO: (melss) Зачем здесь зависимость "..\packages\System.ValueTuple.4.6.2\build\net471\System.ValueTuple.targets"?
-// TODO: (melss) Что это в файле проекта "<Compile Include="Properties\AssemblyInfo.cs" />"?
 using System;
 using System.Collections.Generic;
 using System.Globalization;
@@ -14,7 +10,7 @@ namespace SalesAnalyzer
     internal class Program
     {
         // Шаблон записи о продаже
-        public class SaleRecord // TODO: (melss) Почему отклонились от задания в такой мелочи? "- Читать CSV, преобразовывать строки в объекты `Sale`."
+        public class Sale
         {
             public int OrderId { get; set; }
             public DateTime OrderDate { get; set; }
@@ -30,78 +26,110 @@ namespace SalesAnalyzer
             public decimal Revenue { get; set; }
         }
 
-        static void Main(string[] args)
+        static async Task Main(string[] args)
         {
-            // TODO: (melss) Вообще не понял прикола с 1 или 2. Где ожидаемые аргументы из задания?
-            // TODO: (melss) Нету не одной try/catch. Обработки ошибок не предусмотрено.
-            // Так как работа с аргументами командной строки не реализована,выбор режима выполняется через простое меню в консоли
-            Console.WriteLine("=== Программа анализа продаж ===");
-            Console.WriteLine("Выберите режим:");
-            Console.WriteLine("  1 - Только чтение и вывод в консоль");
-            Console.WriteLine("  2 - Чтение + сохранение результатов в JSON");
-            Console.Write("Ваш выбор (1 или 2): ");
-            string choice = Console.ReadLine();
-            if (choice != "1" && choice != "2")
+            try
             {
-                Console.WriteLine("Неверный выбор. Завершение.");
-                return;
-            }
-            Console.Write("Введите путь к входному CSV-файлу: ");
-            string inputFile = Console.ReadLine();
-            if (string.IsNullOrWhiteSpace(inputFile))
-            {
-                Console.WriteLine("Путь не указан. Завершение.");
-                return;
-            }
-            string outputFile = null;
-            if (choice == "2")
-            {
-                Console.Write("Введите путь для сохранения JSON-файла: ");
-                outputFile = Console.ReadLine();
-                if (string.IsNullOrWhiteSpace(outputFile))
+                string mode = "console";          // по умолчанию
+                string inputFile = null;
+                string outputFile = null;
+
+                foreach (string arg in args)
                 {
-                    Console.WriteLine("Путь не указан. Завершение.");
-                    return;
+                    if (arg.StartsWith("--"))
+                    {
+                        string[] parts = arg.Substring(2).Split('=', 2);
+                        string key = parts[0];
+                        string value = parts[1];
+
+                        if (key == "mode")
+                            mode = value;
+                        else if (key == "input")
+                            inputFile = value;
+                        else if (key == "output")
+                            outputFile = value;
+                    }
                 }
-            }
-                // Читаем файл и выводим таблицу
-                var sales = ReadSalesFromFile(inputFile);
-                PrintSales(sales);
-                Console.WriteLine($"\n Всего записей: {sales.Count}");
-                // Вывод блока аналитики
-                var revenueByCategory = TotalRevenueByCategory(sales);
-                Console.WriteLine("\n=== Общая выручка по категориям ===");
-                foreach (var kv in revenueByCategory)
-                    Console.WriteLine($"{kv.Key,-20} {kv.Value,15:F2}");
-                var top5 = Top5ProductsByQuantity(sales);
-                Console.WriteLine("\n=== Топ-5 категорий по количеству продаж ===");
-                foreach (var kv in top5)
-                    Console.WriteLine($"{kv.Key,-20} {kv.Value,10} шт.");
-                var avgPricePerMonth = AveragePricePerMonth(sales);
-                Console.WriteLine("\n=== Средняя цена за месяц ===");
-                foreach (var kv in avgPricePerMonth)
-                    Console.WriteLine($"{kv.Key,-15:MMMM yyyy} {kv.Value,10:F2}");
-                // Если выбран режим 2, сохраняем JSON
-                if (choice == "2")
+                if (mode == "console")
                 {
+                    // Синхронное чтение + вывод в консоль
+                    var sales = ReadSalesFromFile(inputFile);
+                    PrintSales(sales);
+                    var revenue = TotalRevenueByCategory(sales);
+                    var top5 = Top5ProductsByQuantity(sales);
+                    var avgPrice = AveragePricePerMonth(sales);
+                    PrintAnalytics(revenue, top5, avgPrice);
+                }
+                else if (mode == "file")
+                {
+                    // Синхронное чтение + вычисления + синхронная запись JSON
+                    var sales = ReadSalesFromFile(inputFile);
+                    var revenue = TotalRevenueByCategory(sales);
+                    var top5 = Top5ProductsByQuantity(sales);
+                    var avgPrice = AveragePricePerMonth(sales);
                     var result = new
                     {
-                        TotalRevenueByCategory = revenueByCategory,
+                        TotalRevenueByCategory = revenue,
                         Top5ProductsByQuantity = top5,
-                        AveragePricePerMonth = avgPricePerMonth
+                        AveragePricePerMonth = avgPrice
                     };
-                    SaveToJson(outputFile, result);
+                    SaveToJson(outputFile, result);  // синхронная запись 
                 }
-                Console.WriteLine("\nНажмите любую клавишу для выхода...");
-                Console.ReadKey();
-            
-            
+                else if (mode == "async")
+                {
+                    // Асинхронное чтение
+                    var sales = await ReadSalesFromFileAsync(inputFile);
+
+                    // Вычисления (синхронные)
+                    var revenue = TotalRevenueByCategory(sales);
+                    var top5 = Top5ProductsByQuantity(sales);
+                    var avgPrice = AveragePricePerMonth(sales);
+                    if (!string.IsNullOrEmpty(outputFile))
+                    {
+                        // Асинхронная запись JSON
+                        var result = new
+                        {
+                            TotalRevenueByCategory = revenue,
+                            Top5ProductsByQuantity = top5,
+                            AveragePricePerMonth = avgPrice
+                        };
+                        await SaveToJsonAsync(outputFile, result);
+                    }
+                    else
+                    {
+                        // Вывод в консоль
+                        PrintSales(sales);
+                        PrintAnalytics(revenue, top5, avgPrice);
+                    }
+                }
+                else if (mode == "parallel")
+                {
+                    // Синхронное чтение (как в console)
+                    var sales = ReadSalesFromFile(inputFile);
+                    PrintSales(sales);
+
+                    // Вычисления с параллельной обработкой (флаг true)
+                    var revenue = TotalRevenueByCategory(sales, useParallel: true);
+                    var top5 = Top5ProductsByQuantity(sales, useParallel: true);
+                    var avgPrice = AveragePricePerMonth(sales, useParallel: true);
+
+                    PrintAnalytics(revenue, top5, avgPrice);
+                }
+            }
+
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Ошибка: {ex.Message}");
+                Environment.ExitCode = 1;
+            }
         }
 
-        // Чтение файла CSV и парсинг строк
-        static List<SaleRecord> ReadSalesFromFile(string filePath)
+        static List<Sale> ReadSalesFromFile(string filePath)
         {
-            var sales = new List<SaleRecord>();
+            if (!File.Exists(filePath))
+                throw new FileNotFoundException($"Файл {filePath} не найден.");
+
+            var sales = new List<Sale>();
             using (var reader = new StreamReader(filePath))
             {
                 reader.ReadLine();
@@ -110,22 +138,28 @@ namespace SalesAnalyzer
                 {
                     if (string.IsNullOrWhiteSpace(line))
                         continue;
+
+                    try
                     {
                         var sale = ParseSale(line);
                         sales.Add(sale);
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"Пропущена строка: {line}");
+                        Console.WriteLine($"Ошибка: {ex.Message}");
                     }
                 }
             }
             return sales;
         }
 
-        // Парсинг одной строки из файла CSV
-        static SaleRecord ParseSale(string line)
+        static Sale ParseSale(string line)
         {
             string[] parts = line.Split(',');
             if (parts.Length < 12)
                 throw new FormatException("Неверное количество полей");
-            return new SaleRecord
+            return new Sale
             {
                 OrderId = int.Parse(parts[0]),
                 OrderDate = DateTime.Parse(parts[1], CultureInfo.InvariantCulture),
@@ -142,48 +176,48 @@ namespace SalesAnalyzer
             };
         }
 
-        // Вывод списка в таблицу
-        static void PrintSales(List<SaleRecord> sales)
+        static void PrintSales(List<Sale> sales)
         {
             Console.WriteLine($"{"OrderId",-10} {"Date",-10} {"Category",-15} {"Qty",-5} {"Price",-10} {"Revenue",-12}");
-            Console.WriteLine(new string('-', 65)); // TODO: (melss) Что это за строка? Зачем и почему так написано?
-            for (int i = 0; i < sales.Count; i++)  // TODO: (melss) Объясните почему здесь написали for? Почему не foreach?
+            Console.WriteLine(new string('-', 65));
+            foreach (var s in sales)
             {
-                var s = sales[i];
                 Console.WriteLine($"{s.OrderId,-10} {s.OrderDate:dd.MM.yyyy} {s.ProductCategory,-15} {s.Quantity,-5} {s.UnitPrice,-10:F2} {s.Revenue,-12:F2}");
             }
         }
 
-        // Сумма выручки по категориям
-        public static Dictionary<string, decimal> TotalRevenueByCategory(List<SaleRecord> sales)
+        public static Dictionary<string, decimal> TotalRevenueByCategory(List<Sale> sales, bool useParallel = false)
         {
-            return sales
-                .GroupBy(s => s.ProductCategory)
-                .ToDictionary(g => g.Key, g => g.Sum(s => s.Revenue));
+            var query = sales.GroupBy(s => s.ProductCategory)
+                             .Select(g => new { Category = g.Key, Sum = g.Sum(s => s.Revenue) });
+            if (useParallel)
+                query = query.AsParallel().Select(x => x);
+            return query.ToDictionary(x => x.Category, x => x.Sum);
         }
 
-        // Топ-5 категорий по общему количеству
-        public static Dictionary<string, int> Top5ProductsByQuantity(List<SaleRecord> sales)
+        public static Dictionary<string, int> Top5ProductsByQuantity(List<Sale> sales, bool useParallel = false)
         {
-            return sales
-                .GroupBy(s => s.ProductCategory)
-                .Select(g => new { Category = g.Key, TotalQty = g.Sum(s => s.Quantity) })
-                .OrderByDescending(x => x.TotalQty)
-                .Take(5)
-                .ToDictionary(x => x.Category, x => x.TotalQty);
+            var query = sales.GroupBy(s => s.ProductCategory)
+                             .Select(g => new { Category = g.Key, TotalQty = g.Sum(s => s.Quantity) })
+                             .OrderByDescending(x => x.TotalQty)
+                             .Take(5);
+            if (useParallel)
+                query = query.AsParallel().OrderByDescending(x => x.TotalQty).Take(5);
+            return query.ToDictionary(x => x.Category, x => x.TotalQty);
         }
 
-        // Средняя цена за месяц
-        public static Dictionary<DateTime, decimal> AveragePricePerMonth(List<SaleRecord> sales)
+        public static Dictionary<DateTime, decimal> AveragePricePerMonth(List<Sale> sales, bool useParallel = false)
         {
-            return sales
-                .GroupBy(s => new DateTime(s.OrderDate.Year, s.OrderDate.Month, 1))
-                .ToDictionary(g => g.Key, g => g.Average(s => s.UnitPrice));
+            var query = sales.GroupBy(s => new DateTime(s.OrderDate.Year, s.OrderDate.Month, 1))
+                             .Select(g => new { Month = g.Key, Avg = g.Average(s => s.UnitPrice) });
+            if (useParallel)
+                query = query.AsParallel().Select(x => x);
+            return query.ToDictionary(x => x.Month, x => x.Avg);
         }
 
-        // Сохранение в JSON
         static void SaveToJson(string filePath, object data)
         {
+            try
             {
                 var options = new JsonSerializerOptions
                 {
@@ -192,7 +226,77 @@ namespace SalesAnalyzer
                 };
                 string json = JsonSerializer.Serialize(data, options);
                 File.WriteAllText(filePath, json);
+                Console.WriteLine($"Результаты сохранены в {filePath}");
             }
+            catch (Exception ex)
+            {
+                throw new IOException($"Не удалось записать файл {filePath}: {ex.Message}", ex);
+            }
+
+
+        }
+        static async Task<List<Sale>> ReadSalesFromFileAsync(string filePath)
+        {
+            if (!File.Exists(filePath))
+                throw new FileNotFoundException($"Файл {filePath} не найден.");
+
+            var sales = new List<Sale>();
+            using (var reader = new StreamReader(filePath))
+            {
+                await reader.ReadLineAsync();
+                string line;
+                while ((line = await reader.ReadLineAsync()) != null)
+                {
+                    if (string.IsNullOrWhiteSpace(line))
+                        continue;
+
+                    try
+                    {
+                        var sale = ParseSale(line);
+                        sales.Add(sale);
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"Пропущена строка: {line}");
+                        Console.WriteLine($"Ошибка: {ex.Message}");
+                    }
+                }
+            }
+            return sales;
+        }
+        static async Task SaveToJsonAsync(string filePath, object data)
+        {
+            try
+            {
+                var options = new JsonSerializerOptions
+                {
+                    WriteIndented = true,
+                    PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+                };
+                string json = JsonSerializer.Serialize(data, options);
+                await File.WriteAllTextAsync(filePath, json);
+                Console.WriteLine($"Результаты сохранены в {filePath}");
+            }
+            catch (Exception ex)
+            {
+                throw new IOException($"Не удалось записать файл {filePath}: {ex.Message}", ex);
+            }
+        }
+        static void PrintAnalytics(Dictionary<string, decimal> revenue,
+                           Dictionary<string, int> top5,
+                           Dictionary<DateTime, decimal> avgPrice)
+        {
+            Console.WriteLine("\n=== Общая выручка по категориям ===");
+            foreach (var kv in revenue)
+                Console.WriteLine($"{kv.Key,-20} {kv.Value,15:F2}");
+
+            Console.WriteLine("\n=== Топ-5 категорий по количеству продаж ===");
+            foreach (var kv in top5)
+                Console.WriteLine($"{kv.Key,-20} {kv.Value,10} шт.");
+
+            Console.WriteLine("\n=== Средняя цена за месяц ===");
+            foreach (var kv in avgPrice)
+                Console.WriteLine($"{kv.Key,-15:MMMM yyyy} {kv.Value,10:F2}");
         }
     }
 }
