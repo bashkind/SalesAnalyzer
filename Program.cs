@@ -64,6 +64,7 @@ namespace SalesAnalyzer
                 {
                     // Синхронное чтение + вычисления + синхронная запись JSON
                     var sales = ReadSalesFromFile(inputFile);
+                    PrintSales(sales);
                     var revenue = TotalRevenueByCategory(sales);
                     var top5 = Top5ProductsByQuantity(sales);
                     var avgPrice = AveragePricePerMonth(sales);
@@ -73,6 +74,7 @@ namespace SalesAnalyzer
                         Top5ProductsByQuantity = top5,
                         AveragePricePerMonth = avgPrice
                     };
+                    PrintAnalytics(revenue, top5, avgPrice);
                     SaveToJson(outputFile, result);  // синхронная запись 
                 }
                 else if (mode == "async")
@@ -95,12 +97,9 @@ namespace SalesAnalyzer
                         };
                         await SaveToJsonAsync(outputFile, result);
                     }
-                    else
-                    {
-                        // Вывод в консоль
-                        PrintSales(sales);
-                        PrintAnalytics(revenue, top5, avgPrice);
-                    }
+                    PrintSales(sales);
+                    PrintAnalytics(revenue, top5, avgPrice);
+                    
                 }
                 else if (mode == "parallel")
                 {
@@ -114,6 +113,27 @@ namespace SalesAnalyzer
                     var avgPrice = AveragePricePerMonth(sales, useParallel: true);
 
                     PrintAnalytics(revenue, top5, avgPrice);
+                }
+                else if (mode == "full")
+                {
+                    var sales = await ReadSalesFromFileAsync(inputFile);
+                    var revenue = TotalRevenueByCategory(sales, useParallel: true);
+                    var top5 = Top5ProductsByQuantity(sales, useParallel: true);
+                    var avgPrice = AveragePricePerMonth(sales, useParallel: true);
+                    if (!string.IsNullOrEmpty(outputFile))
+                    {
+                        // Асинхронная запись JSON
+                        var result = new
+                        {
+                            TotalRevenueByCategory = revenue,
+                            Top5ProductsByQuantity = top5,
+                            AveragePricePerMonth = avgPrice
+                        };
+                        await SaveToJsonAsync(outputFile, result);
+                    }
+                    PrintSales(sales);
+                    PrintAnalytics(revenue, top5, avgPrice);
+                    
                 }
             }
 
