@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "SalesAnalyzerNew": {
+      "commandName": "Project",
+      "commandLineArgs": "--input=sales_5000.csv --mode=console --output=result.txt"
+    }
+  }
+}
